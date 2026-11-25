@@ -1,0 +1,73 @@
+// This file is part of Ravi Chauhan's Nand2Tetris Capstone Project (Roll No: 2501730403)
+// File name: CPU.hdl
+
+/**
+ * The Hack CPU (Central Processing unit), consisting of an ALU,
+ * two registers named A and D, and a program counter named PC.
+ * The CPU is designed to fetch and execute instructions written in
+ * the Hack machine language.
+ */
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M?
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+    // Decode opcode: instruction[15] == 0 -> A-instruction, 1 -> C-instruction
+    Not(in=instruction[15], out=isAInstruction);
+
+    // A-register takes instruction value for A-instructions, or ALU output for C-instructions
+    Mux16(a=instruction, b=aluOut, sel=instruction[15], out=aRegInput);
+    And(a=instruction[15], b=instruction[5], out=destA);
+    Or(a=isAInstruction, b=destA, out=loadA);
+    ARegister(in=aRegInput, load=loadA, out=aRegOut, out[0..14]=addressM);
+
+    // D-register loads ALU output only on C-instruction when d2 (instruction[4]) is set
+    And(a=instruction[15], b=instruction[4], out=loadD);
+    DRegister(in=aluOut, load=loadD, out=dRegOut);
+
+    // Select second ALU operand: A register (a=0) or M input (a=1)
+    Mux16(a=aRegOut, b=inM, sel=instruction[12], out=aluY);
+
+    // Execute ALU operation using c1..c6 bits (instruction[11..6])
+    ALU(
+        x=dRegOut,
+        y=aluY,
+        zx=instruction[11],
+        nx=instruction[10],
+        zy=instruction[9],
+        ny=instruction[8],
+        f=instruction[7],
+        no=instruction[6],
+        out=aluOut,
+        out=outM,
+        zr=zr,
+        ng=ng
+    );
+
+    // Write to Memory[A] only on C-instruction when d3 (instruction[3]) is set
+    And(a=instruction[15], b=instruction[3], out=writeM);
+
+    // Compute jump condition from j1 (neg), j2 (zero), j3 (pos)
+    Or(a=zr, b=ng, out=isZeroOrNeg);
+    Not(in=isZeroOrNeg, out=isPositive);
+
+    And(a=instruction[2], b=ng, out=jumpLT);
+    And(a=instruction[1], b=zr, out=jumpEQ);
+    And(a=instruction[0], b=isPositive, out=jumpGT);
+
+    Or(a=jumpLT, b=jumpEQ, out=jumpLE);
+    Or(a=jumpLE, b=jumpGT, out=jumpCondition);
+    And(a=instruction[15], b=jumpCondition, out=loadPC);
+
+    // Program Counter: reset > jump (load) > increment
+    PC(in=aRegOut, load=loadPC, inc=true, reset=reset, out[0..14]=pc);
+}
