@@ -1,0 +1,15 @@
+# Hack Assembler Symbol Table (K = 03, K mod 3 = 0)
+
+[LABELS - ROM Addresses]
+MAIN_LOOP = 0
+KEY_PRESSED = 8
+DRAW_BOX = 10
+ROW_LOOP = 20
+COL_LOOP = 28
+
+[VARIABLES - RAM Addresses starting at 16]
+color = 16
+rowPtr = 17
+rowCount = 18
+colPtr = 19
+wordCount = 20
